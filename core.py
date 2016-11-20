@@ -3,12 +3,11 @@
 # http://stackoverflow.com/questions/15198426/fixing-invalid-json-escape
 # http://stackoverflow.com/questions/7917107/add-footnote-under-the-x-axis-using-matplotlib
 
+import sys
 import urllib.request
 import re
 import json
-from collections import namedtuple
 from datetime import date
-from operator import mul
 import matplotlib.pyplot as pyplot
 from math import log, sqrt
 
@@ -97,10 +96,8 @@ class OptionSet():
         self.short = nameshort + "_" + end_date.isoformat()
         self.calls = calls
         self.puts = puts
-        self.maturity = (end_date - date.today()).days
+        self.maturity = (end_date - date.today()).days/365.25
 
-    def putcall_parity(self):
-        pass
 
     def export_plots(self):
         xc, yc = zip(*sorted(self.calls.items()))
@@ -113,8 +110,19 @@ class OptionSet():
         pyplot.title(self.name)
         pyplot.annotate(self.descr, (0, 1), (5, -5), xycoords='axes fraction', textcoords='offset points', va='top',
                         ha='left')
-        pyplot.savefig(self.short)
+        pyplot.savefig("option_price_" + self.short)
         pyplot.close()
+
+    def calculate_S0_r(self):
+        x = list(sorted(list(set(self.calls.keys()).intersection(set(self.puts.keys())))))
+        y = [self.calls[x_]-self.puts[x_] for x_ in x]
+        a,S0,sa,sS0 = plot_regression(self.name,"call-put_parity_"+self.short,x,y)
+        r = -log(-a)/self.maturity
+        sr = sa/(-self.maturity*a)
+        return S0,r,sS0,sr
+
+
+
 
 
 def extract_date(dict_):
@@ -138,28 +146,33 @@ def regression(x, y):
     assert len(y) == N, "Elements of x and y are not equal"
     Sx = sum(x)
     Sy = sum(y)
-    Sxx = sum(map(mul, x, x))
-    Sxy = sum(map(mul, x, y))
-    Syy = sum(map(mul, y, y))
-    b = (N * Sxy - Sx*Sy) / (N * Sxx - Sx ** 2)
-    a = (Sy / N - b * Sx /N)
-    s2 = 1 / N / (N - 2) * (N* Syy - Sy**2 - b**2 * (N*Sxx - Sx**2))
-    sb = sqrt(N * s2 / (N*Sxx - Sx**2))
-    sa = sqrt(sb - Sxx/N)
+    Sxx = sum(x_**2 for x_ in x)
+    Sxy = sum(x_*y_ for x_,y_ in zip(x,y))
+    Syy = sum(y_**2 for y_ in y)
+    a = (N * Sxy - Sx*Sy) / (N * Sxx - Sx ** 2)
+    b = (Sy / N - a * Sx /N)
+    s2 = 1 / N / (N - 2) * (N* Syy - Sy**2 - a**2 * (N*Sxx - Sx**2))
+    sa = sqrt(N * s2 / (N*Sxx - Sx**2))
+    sb = sqrt(sa**2 * Sxx/N)
     return a, b, sa, sb
 
 
 def plot_regression(title,filename, x, y):
-    a, b, *_ = regression(x,y)
-    ry = (a*x_ + b for x_ in x)
+    a, b, sa, sb = regression(x,y)
+    print(a,b)
+    ry = [a*x_ + b for x_ in x]
     pyplot.plot(x, y, "b+", x, ry, "r")
     pyplot.xlabel(r"strike price")
     pyplot.ylabel(r"price call-put")
     pyplot.title(title)
     pyplot.savefig(filename)
+    pyplot.close()
+    return a,b,sa,sb
 
 
 if __name__ == "__main__":
+
     o = OptionLoader("MSFT")
     for d in o.get_optionssets():
         d.export_plots()
+        d.calculate_S0_r()

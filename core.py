@@ -1,7 +1,5 @@
 # http://www.nasdaq.com/quotes/
 # https://www.google.com/finance/option_chain
-# http://stackoverflow.com/questions/15198426/fixing-invalid-json-escape
-# http://stackoverflow.com/questions/7917107/add-footnote-under-the-x-axis-using-matplotlib
 
 import sys
 import urllib.request
@@ -19,7 +17,7 @@ SYMBOLS = "AAPL,TSLA,FB,MSFT,AKS,ETP,GOOG,AMZN,F,TWTR".split(",")
 
 class Scraper():
     fixer = re.compile(r'(?<=[{,])([A-Za-z0-9_]*)(?=:)')
-    invalid_escape = re.compile(r'\\x[0-7][0-9A-Fa-f]')
+    invalid_chars = re.compile(r'\\x[0-7][0-9A-Fa-f]')
 
     def __init__(self):
         pass
@@ -39,7 +37,7 @@ class Scraper():
         if jsonstring.startswith("\n// "):
             jsonstring = jsonstring[4:]
 
-        jsonstring = Scraper.invalid_escape.sub("?", jsonstring)
+        jsonstring = Scraper.invalid_chars.sub("?", jsonstring)
         return json.loads(jsonstring)
 
     def __call__(self, sub, **kwargs):

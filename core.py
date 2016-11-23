@@ -9,7 +9,10 @@ import re
 import json
 from datetime import date
 import matplotlib.pyplot as pyplot
-from math import log, sqrt
+from math import log, sqrt, exp
+from scipy.special import erfc
+from scipy.optimize import root
+from functools import partial
 
 SYMBOLS = "AAPL,TSLA,FB,MSFT,AKS,ETP,GOOG,AMZN,F,TWTR".split(",")
 
@@ -70,6 +73,11 @@ class OptionLoader():
         self.symbol = symbol
         self.name = OptionLoader.scraper("", q=self.symbol)[0]["name"]
         print("loading", self.name)
+        self.load_data_jsons()
+    def load_data_jsons(self):
+        self.data = {}
+        for i in self.get_end_dates():
+            self.data[i] = OptionLoader.scraper("option_chain", q=self.symbol, **pack_date_custom(i))
 
     def get_end_dates(self):
         for dict_ in (OptionLoader.scraper("option_chain", q=self.symbol).get("expirations", ())):
@@ -77,7 +85,7 @@ class OptionLoader():
 
     def get_options(self, type_, end_date):
         assert type_ in ("call", 'put'), "type should be 'call' or 'put'"
-        info = OptionLoader.scraper("option_chain", q=self.symbol, **pack_date_custom(end_date)).get(type_ + "s", ())
+        info = self.data[end_date].get(type_ + "s", ())
         # for e in info:
         #    yield Option(e["strike"],(end_date-date.today()).days,e["p"],e["a"],e["b"])
         return {strpnumber(e["strike"]): strpnumber(e["p"]) for e in info if e["strike"] != "-" and e["p"] != "-"}
@@ -100,6 +108,9 @@ class OptionSet():
 
 
     def export_plots(self):
+        self.plot_call_put_graph()
+        self.plot_implicit()
+    def plot_call_put_graph(self):
         xc, yc = zip(*sorted(self.calls.items()))
         xp, yp = zip(*sorted(self.puts.items()))
         # print(xc,yc,xp,yp)
@@ -121,7 +132,24 @@ class OptionSet():
         sr = sa/(-self.maturity*a)
         return S0,r,sS0,sr
 
+    def get_implicit_volatility(self):
 
+        T = self.maturity
+        S0,r ,sS0,sr = self.calculate_S0_r()
+        error= sS0/S0/T + sr
+        for K,V in self.calls.items():
+            sigma = implicit_volatility(S0,K,r,T)
+            ssigma = error*sigma
+            yield K,sigma,ssigma
+
+    def plot_implicit(self):
+        K,sigmas,ssigmas = zip(*sorted(self.get_implicit_volatility()))
+        pyplot.errorbar(K, sigmas , xerr=0, yerr=ssigmas)
+        pyplot.xlabel(r"strike price")
+        pyplot.ylabel(r"implicit volatility")
+        pyplot.title("Implicit volatiliy")
+        pyplot.savefig("impl_vol_"+self.short)
+        pyplot.close()
 
 
 
@@ -156,10 +184,18 @@ def regression(x, y):
     sb = sqrt(sa**2 * Sxx/N)
     return a, b, sa, sb
 
+def black_scholes_V_call(S0,K,r,T,volatility):
+    X = log(S0/K) + r*T
+    Y = volatility**2 * T
+    D = exp(-r*T)
+    return S0*erfc((X + Y)/sqrt(Y)) - K*D*erfc((X - Y)/sqrt(Y))
+
+def implicit_volatility(S0,K,r,T):
+    return root(partial(black_scholes_V_call,S0,K,r,T),0.3).x
 
 def plot_regression(title,filename, x, y):
     a, b, sa, sb = regression(x,y)
-    print(a,b)
+    #print(a,b)
     ry = [a*x_ + b for x_ in x]
     pyplot.plot(x, y, "b+", x, ry, "r")
     pyplot.xlabel(r"strike price")
@@ -171,8 +207,8 @@ def plot_regression(title,filename, x, y):
 
 
 if __name__ == "__main__":
-
-    o = OptionLoader("MSFT")
-    for d in o.get_optionssets():
-        d.export_plots()
-        d.calculate_S0_r()
+    for s in SYMBOLS:
+        o = OptionLoader(s)
+        for d in o.get_optionssets():
+            d.export_plots()
+            print(d.calculate_S0_r())

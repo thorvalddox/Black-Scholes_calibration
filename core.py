@@ -48,10 +48,6 @@ def build_quary(dict_):
     return "&".join("{}={}".format(k, v) for k, v in dict_.items())
 
 
-def replace_with_byte(match):
-    return chr(int(match.group(0)[2:], 8))
-
-
 def print_json(json_):
     print(json.dumps(json_, indent=3))
 

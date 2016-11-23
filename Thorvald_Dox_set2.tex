@@ -1,0 +1,102 @@
+% ****** Start of file aipsamp.tex ******
+%
+%   This file is part of the AIP files in the AIP distribution for REVTeX 4.
+%   Version 4.1 of REVTeX, October 2009
+%
+%   Copyright (c) 2009 American Institute of Physics.
+%
+%   See the AIP README file for restrictions and more information.
+%
+% TeX'ing this file requires that you have AMS-LaTeX 2.0 installed
+% as well as the rest of the prerequisites for REVTeX 4.1
+%
+% It also requires running BibTeX. The commands are as follows:
+%
+%  1)  latex  aipsamp
+%  2)  bibtex aipsamp
+%  3)  latex  aipsamp
+%  4)  latex  aipsamp
+%
+% Use this file as a source of example code for your aip document.
+% Use the file aiptemplate.tex as a template for your document.
+\documentclass[%
+ aip,
+ jmp,%
+ amsmath,amssymb,
+%preprint,%
+ reprint,%
+%author-year,%
+%author-numerical,
+]{revtex4-1}
+
+\usepackage[dutch]{babel}
+
+\usepackage{graphicx}% Include figure files
+\usepackage{dcolumn}% Align table columns on decimal point
+\usepackage{bm}% bold math
+\usepackage[mathlines]{lineno}% Enable numbering of text and display math
+%\linenumbers\relax % Commence numbering lines
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{braket}
+\allowdisplaybreaks
+
+\newcommand{\eqsplit}{\nonumber \\&}
+
+\newcommand{\quickfigure}[2]{
+\begin{figure}[t]
+\includegraphics[width=0.99\linewidth]{#1}
+\caption{\textit{#2 Deze plot is gemaakt met Anaconda\citep{anaconda}}\label{fig:#1}}
+\end{figure}
+\ref{fig:#1}
+}
+
+\begin{document}
+
+\preprint{AIP/123-QED}
+
+\title[Calibratie van de Black-Scholes Parameter]{Calibratie van de Black-Scholes Parameter}% Force line breaks with \\
+\author{Thorvald Dox}
+\affiliation{ Universiteit Antwerpen
+%\\This line break forced with \textbackslash\textbackslash
+}%
+\date{\today}% It is always \today, today,
+             %  but any date may be explicitly specified
+             
+\begin{abstract}
+Dit verslag bevat de oplossing van de tweede probleemset van het vak Padintergralen voor Optiepijzen uit het academiejaar 2016-2017. Alle bewerkingen hier beschreven staan geprogrammeerd in het bijgevoegde programma geschreven in Anaconda\cite{anaconda}. Ook bijgevoegd zijn grafieken van verschillende bedrijven uit Nasdaq\cite{nasdaq}, die niet allemaal in dit verslag gebruikt zijn. 
+\end{abstract}
+
+\pacs{}% PACS, the Physics and Astronomy
+                             % Classification Scheme.
+\keywords{}%Use showkeys class option if keyword
+                              %display desired
+\maketitle
+
+\section{Prijzen}
+
+De prijzen in dit verslag zijn gehaald uit \textit{Google finance}\cite{gf}. Deze zijn ingeladen in het programma
+via de json-api. Dit gebeurt door aan de url de query ''output=json" toe te voegen. Deze wordt dan verwerkt tot een leesbaar json-formaat en dan uitgelezen. De exacte werking van de api kan gevonden worden op \textit{Google finance}\cite{gf}. De klasse ''Scraper'' in het bijgeleverde programma haalt de data van het internet en zet deze om naar een leesbaar formaat, en de ''OptionLoader'' klasse gebruikt deze dan om de optieprijzen te bepalen. Een voorbeeld van de optieprijzen voor aandelen van Microsoft zien we in figuur \quickfigure{option_price_MSFT_2017-04-21.png}{Prijs van call en put opties in functie van de strike prijs van microsoft, voor een looptijd van 23 november 2016 tot 21 april 2017.}.
+
+\section{call-put pariteit}
+
+In deze sectie maken we gebruik van de call-put pariteit om de oorspronkelijke prijs en de rente te bepalen. Hierbij maken we gebruik van de gelijkheid $$C-P = S_0 - K e^{rT}$$. Om hieruit $S_0$ en $r$ te bepalen maken we gebruik van lineaire regressie. Dit heeft als voordeel dat men hieruit ook een nauwkeurigheid op $S_0$ en $r$. Bijvoorbeeld in het geval van microsoft geeft dit $S_0 = 58.22221173574067 \mp 0.8368938247316544$ en  $r = 0.11213121309700451 \mp 0.041630632739604344$. De regressie kan gezien worden in figuur \quickfigure{call-put_parity_MSFT_2017-04-21.png}{Regressie van de call-put parity voor het aandeel van Microsoft.}. Deze rente van 11\% komt onverwacht aangezien LIBOR\cite{global} een interest heeft van 36\% voor deze termijn. 
+
+\section{geimpliceerde volatiliteit}
+
+Gebruik makend van formule 6.31 uit \textit{Padintegralen voor Optieprijzen}\citep{cursus}, kan de impliciete volatiliteit uitgerekend worden. In het bijgevoegde programma wordt dit gedaan door middel van ''find-root''. Als we kijken daar de foutenvlaggen op de impliciete volatiliteit dan zien we in de formule dat de grootste bijdrage geleverd zal worden uit de termen staande in de errorfunctie, dus kunnen de foutenvlaggen bepaald worden uit $\frac{S(\sigma)T}{\sigma} = S(\log(S_0) - \log(K)) + S(r)T$ wat wil zeggen dat $S(\sigma) = \sigma\left(\frac{S(S_0)}{S_0 t} + S(r)\right)$ met $S(x)$ de foutenvlag op $x$. De impliciete volatiliteit met foutenvlaggen staat gegeven in figuur \quickfigure{impl_vol_MSFT_2017-04-21.png}{De impliciete volatiliteit voor Microsoft.}. Als het Black-Scholes model exact correct zou zijn, zou de volatiliteit constant zijn. Dit is niet het geval. De volatiliteit gaat langzaam omhoog wanneer de strike prijs kleiner wordt, en wanneer de strike prijs boven de oorspronkelijke prijs ligt, varieert deze enorm. Merk ook op dat de foutenvlaggen kleiner zijn hoe dichter de strike prijs bij de oorspronkelijke prijs ligt. Voor een langere looptijd verwachten we dat de volatiliteit kleiner wordt, aangezien verschillende uitschieters elkaar uitmiddelen. De impliciete volatiliteit voor een langere looptijd kan gezien worden in figuur \quickfigure{impl_vol_MSFT_2018-01-19.png}{De impliciete volatiliteit voor Microsoft voor langere looptijd, namelijk Januari 2018.}
+
+\section{Historische volatiliteit}
+
+
+\nocite{sjab}
+
+\bibliographystyle{plain}
+\bibliography{Thorvald_Dox_set2}
+
+
+\end{document}
+
+% ****** End of file aipsamp.tex ******
